@@ -24,3 +24,12 @@ export interface SortOptions {
   field: 'name' | 'totalRevenue' | 'itemsSold';
   direction: SortDirection;
 }
+
+export interface CrawlerStats {
+  isRunning: boolean;
+  totalDiscovered: number;
+  totalProcessed: number;
+  queuedUrls: number;
+  interval: number;
+  batchSize: number;
+}

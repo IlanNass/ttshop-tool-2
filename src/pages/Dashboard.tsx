@@ -1,12 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ScraperForm from '@/components/scraper/ScraperForm';
 import DataTable from '@/components/scraper/DataTable';
+import CrawlerControl from '@/components/scraper/CrawlerControl';
 import { ShopData } from '@/lib/types';
+import { TikTokCrawlerService } from '@/services/TikTokCrawlerService';
 
 // Mock data for demonstration
 const mockShopData: ShopData = {
@@ -56,6 +58,17 @@ const mockShopData: ShopData = {
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [shopData, setShopData] = useState<ShopData | null>(null);
+  const [autoDiscoveryEnabled, setAutoDiscoveryEnabled] = useState(false);
+
+  // Initialize with data from the crawler service if it exists
+  useEffect(() => {
+    const crawlerService = TikTokCrawlerService.getInstance();
+    const initialData = crawlerService.getCollectedData();
+    
+    if (initialData.shops.length > 0) {
+      setShopData(initialData);
+    }
+  }, []);
 
   const handleScrape = (url: string) => {
     setIsLoading(true);
@@ -68,6 +81,13 @@ const Dashboard = () => {
         description: 'TikTok Shop data has been successfully analyzed.'
       });
     }, 2500);
+  };
+
+  const handleCrawlerDataUpdate = (data: ShopData) => {
+    setShopData(data);
+    toast.info('New data collected', {
+      description: `Automatically analyzed ${data.shops.length} TikTok Shops.`,
+    });
   };
 
   return (
@@ -84,13 +104,14 @@ const Dashboard = () => {
           <div className="max-w-3xl mx-auto mb-12 text-center">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">TikTok Shop Analyzer Dashboard</h1>
             <p className="text-muted-foreground text-lg">
-              Extract data from TikTok Shop and analyze performance metrics.
+              Extract data from TikTok Shop and analyze performance metrics automatically.
             </p>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-8">
               <ScraperForm onScrape={handleScrape} isLoading={isLoading} />
+              <CrawlerControl onDataUpdate={handleCrawlerDataUpdate} />
             </div>
             <div className="lg:col-span-2">
               <DataTable data={shopData} isLoading={isLoading} />
