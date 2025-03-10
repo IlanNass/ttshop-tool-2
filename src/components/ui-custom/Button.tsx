@@ -1,9 +1,14 @@
+
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, HTMLMotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import { buttonHover } from '@/lib/animations';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+// Create a separate type that extends HTMLMotionProps for the button
+type MotionButtonProps = Omit<HTMLMotionProps<"button">, keyof ButtonProps>;
+
+interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
@@ -12,6 +17,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   href?: string;
   isExternal?: boolean;
+  className?: string;
 }
 
 const Button = ({
@@ -25,7 +31,7 @@ const Button = ({
   href,
   isExternal = false,
   ...props
-}: ButtonProps) => {
+}: ButtonProps & React.ButtonHTMLAttributes<HTMLButtonElement>) => {
   const getVariantClasses = () => {
     switch (variant) {
       case 'primary':
@@ -72,6 +78,12 @@ const Button = ({
     </>
   );
 
+  const animationProps = {
+    whileTap: { scale: 0.98 },
+    whileHover: variant !== 'link' ? { scale: 1.03 } : undefined,
+    transition: { duration: 0.2 }
+  };
+
   if (href) {
     if (isExternal) {
       return (
@@ -80,18 +92,14 @@ const Button = ({
           className={buttonClasses}
           target="_blank"
           rel="noopener noreferrer"
-          whileTap={{ scale: 0.98 }}
-          whileHover={variant !== 'link' ? { scale: 1.03 } : undefined}
+          {...animationProps}
         >
           {buttonContent}
         </motion.a>
       );
     } else {
       return (
-        <motion.div
-          whileTap={{ scale: 0.98 }}
-          whileHover={variant !== 'link' ? { scale: 1.03 } : undefined}
-        >
+        <motion.div {...animationProps}>
           <Link to={href} className={buttonClasses}>
             {buttonContent}
           </Link>
@@ -100,13 +108,14 @@ const Button = ({
     }
   }
 
+  // Use type assertion to safely pass props to motion.button
+  const buttonProps = props as MotionButtonProps;
+
   return (
     <motion.button
       className={buttonClasses}
-      whileTap={{ scale: 0.98 }}
-      whileHover={variant !== 'link' ? { scale: 1.03 } : undefined}
-      transition={{ duration: 0.2 }}
-      {...props}
+      {...animationProps}
+      {...buttonProps}
     >
       {buttonContent}
     </motion.button>
