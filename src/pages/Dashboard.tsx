@@ -7,8 +7,10 @@ import Footer from '@/components/layout/Footer';
 import ScraperForm from '@/components/scraper/ScraperForm';
 import DataTable from '@/components/scraper/DataTable';
 import CrawlerControl from '@/components/scraper/CrawlerControl';
+import TrendingShops from '@/components/scraper/TrendingShops';
 import { ShopData } from '@/lib/types';
 import { TikTokCrawlerService } from '@/services/TikTokCrawlerService';
+import { DatabaseService } from '@/services/DatabaseService';
 
 // Mock data for demonstration
 const mockShopData: ShopData = {
@@ -58,7 +60,7 @@ const mockShopData: ShopData = {
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [shopData, setShopData] = useState<ShopData | null>(null);
-  const [autoDiscoveryEnabled, setAutoDiscoveryEnabled] = useState(false);
+  const [trendTimeRange, setTrendTimeRange] = useState(30); // 30 days default
 
   // Initialize with data from the crawler service if it exists
   useEffect(() => {
@@ -77,6 +79,11 @@ const Dashboard = () => {
     setTimeout(() => {
       setShopData(mockShopData);
       setIsLoading(false);
+      
+      // Save to database
+      const dbService = DatabaseService.getInstance();
+      dbService.saveShopsData(mockShopData.shops);
+      
       toast.success('Analysis completed', {
         description: 'TikTok Shop data has been successfully analyzed.'
       });
@@ -108,13 +115,23 @@ const Dashboard = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 space-y-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+            <div className="lg:col-span-3 space-y-8">
               <ScraperForm onScrape={handleScrape} isLoading={isLoading} />
               <CrawlerControl onDataUpdate={handleCrawlerDataUpdate} />
             </div>
-            <div className="lg:col-span-2">
+            
+            <div className="lg:col-span-9 space-y-8">
               <DataTable data={shopData} isLoading={isLoading} />
+              
+              <div className="mt-12 pt-8 border-t">
+                <TrendingShops timeRange={trendTimeRange} />
+              </div>
+              
+              <div className="text-center text-xs text-muted-foreground mt-8">
+                <p>Shop data is saved automatically for trend analysis.</p>
+                <p>The trend analysis looks for significant changes in shop revenue over time.</p>
+              </div>
             </div>
           </div>
         </div>

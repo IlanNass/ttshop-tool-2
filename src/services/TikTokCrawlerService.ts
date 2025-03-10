@@ -1,5 +1,5 @@
-
-import { ShopData, Shop, ShopProduct } from '@/lib/types';
+import { ShopData, Shop, ShopProduct, CrawlerStats } from '@/lib/types';
+import { DatabaseService } from './DatabaseService';
 
 // Mock shop URLs to crawl automatically
 const TIKTOK_SHOP_URLS = [
@@ -28,9 +28,11 @@ export class TikTokCrawlerService {
   private onDataUpdateCallbacks: ((data: ShopData) => void)[] = [];
   private processedUrls: Set<string> = new Set();
   private discoveredUrls: string[] = [...TIKTOK_SHOP_URLS];
+  private dbService: DatabaseService;
   
   private constructor() {
     // Private constructor to enforce singleton pattern
+    this.dbService = DatabaseService.getInstance();
   }
 
   public static getInstance(): TikTokCrawlerService {
@@ -89,19 +91,14 @@ export class TikTokCrawlerService {
     };
   }
 
-  public getCurrentStatus(): {
-    isRunning: boolean;
-    totalDiscovered: number;
-    totalProcessed: number;
-    queuedUrls: number;
-    options: CrawlerOptions;
-  } {
+  public getCurrentStatus(): CrawlerStats {
     return {
       isRunning: this.isRunning,
       totalDiscovered: this.discoveredUrls.length,
       totalProcessed: this.processedUrls.size,
       queuedUrls: this.discoveredUrls.filter(url => !this.processedUrls.has(url)).length,
-      options: this.options,
+      interval: this.options.interval,
+      batchSize: this.options.batchSize,
     };
   }
 
@@ -144,6 +141,9 @@ export class TikTokCrawlerService {
     
     // Update timestamp
     this.shopData.lastUpdated = new Date().toLocaleString();
+    
+    // Save data to database
+    this.dbService.saveShopsData(this.shopData.shops);
     
     // Notify subscribers
     this.notifyDataUpdated();

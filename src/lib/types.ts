@@ -33,3 +33,22 @@ export interface CrawlerStats {
   interval: number;
   batchSize: number;
 }
+
+// New types for historical data tracking
+export interface RevenueSnapshot {
+  shopName: string;
+  totalRevenue: number;
+  itemsSold: number;
+  timestamp: string;
+}
+
+export interface TrendData {
+  shopName: string;
+  trend: 'up' | 'down' | 'stable';
+  percentChange: number;
+  revenueData: {
+    timestamp: string;
+    totalRevenue: number;
+  }[];
+}
+
