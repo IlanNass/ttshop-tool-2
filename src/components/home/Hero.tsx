@@ -57,19 +57,17 @@ const Hero = () => {
             className="flex flex-col sm:flex-row gap-4 justify-center"
             variants={fadeInUp}
           >
-            <Link to="/dashboard">
-              <Button 
-                size="lg" 
-                icon={<ArrowRight size={18} />} 
-                iconPosition="right"
-              >
-                Get Started
-              </Button>
-            </Link>
+            <Button 
+              size="lg" 
+              icon={<ArrowRight size={18} />} 
+              iconPosition="right"
+              href="/dashboard"
+            >
+              Get Started
+            </Button>
             <Button 
               variant="outline" 
               size="lg"
-              as="a" 
               href="#features"
             >
               Learn More

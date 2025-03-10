@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
@@ -10,6 +10,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
   fullWidth?: boolean;
+  href?: string;
+  isExternal?: boolean;
 }
 
 const Button = ({
@@ -20,6 +22,8 @@ const Button = ({
   icon,
   iconPosition = 'left',
   fullWidth = false,
+  href,
+  isExternal = false,
   ...props
 }: ButtonProps) => {
   const getVariantClasses = () => {
@@ -52,23 +56,59 @@ const Button = ({
     }
   };
 
+  const buttonClasses = cn(
+    'relative inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
+    getVariantClasses(),
+    getSizeClasses(),
+    fullWidth && 'w-full',
+    className
+  );
+
+  const buttonContent = (
+    <>
+      {icon && iconPosition === 'left' && <span className="mr-2">{icon}</span>}
+      {children}
+      {icon && iconPosition === 'right' && <span className="ml-2">{icon}</span>}
+    </>
+  );
+
+  if (href) {
+    if (isExternal) {
+      return (
+        <motion.a
+          href={href}
+          className={buttonClasses}
+          target="_blank"
+          rel="noopener noreferrer"
+          whileTap={{ scale: 0.98 }}
+          whileHover={variant !== 'link' ? { scale: 1.03 } : undefined}
+        >
+          {buttonContent}
+        </motion.a>
+      );
+    } else {
+      return (
+        <motion.div
+          whileTap={{ scale: 0.98 }}
+          whileHover={variant !== 'link' ? { scale: 1.03 } : undefined}
+        >
+          <Link to={href} className={buttonClasses}>
+            {buttonContent}
+          </Link>
+        </motion.div>
+      );
+    }
+  }
+
   return (
     <motion.button
-      className={cn(
-        'relative inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
-        getVariantClasses(),
-        getSizeClasses(),
-        fullWidth && 'w-full',
-        className
-      )}
+      className={buttonClasses}
       whileTap={{ scale: 0.98 }}
       whileHover={variant !== 'link' ? { scale: 1.03 } : undefined}
       transition={{ duration: 0.2 }}
       {...props}
     >
-      {icon && iconPosition === 'left' && <span className="mr-2">{icon}</span>}
-      {children}
-      {icon && iconPosition === 'right' && <span className="ml-2">{icon}</span>}
+      {buttonContent}
     </motion.button>
   );
 };
