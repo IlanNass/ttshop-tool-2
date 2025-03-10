@@ -2,7 +2,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import Button from '../ui-custom/Button';
 import { fadeInDown, fadeInUp, staggerContainer } from '@/lib/animations';
 

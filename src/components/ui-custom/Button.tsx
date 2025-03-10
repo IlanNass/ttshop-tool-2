@@ -1,12 +1,7 @@
 
 import React from 'react';
-import { motion, HTMLMotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
-import { buttonHover } from '@/lib/animations';
-
-// Create a separate type that extends HTMLMotionProps for the button
-type MotionButtonProps = Omit<HTMLMotionProps<"button">, keyof ButtonProps>;
 
 interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
@@ -18,6 +13,7 @@ interface ButtonProps {
   href?: string;
   isExternal?: boolean;
   className?: string;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
 }
 
 const Button = ({
@@ -30,8 +26,9 @@ const Button = ({
   fullWidth = false,
   href,
   isExternal = false,
+  onClick,
   ...props
-}: ButtonProps & React.ButtonHTMLAttributes<HTMLButtonElement>) => {
+}: ButtonProps & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, keyof ButtonProps>) => {
   const getVariantClasses = () => {
     switch (variant) {
       case 'primary':
@@ -63,7 +60,7 @@ const Button = ({
   };
 
   const buttonClasses = cn(
-    'relative inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
+    'relative inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] hover:scale-[1.03]',
     getVariantClasses(),
     getSizeClasses(),
     fullWidth && 'w-full',
@@ -78,47 +75,40 @@ const Button = ({
     </>
   );
 
-  const animationProps = {
-    whileTap: { scale: 0.98 },
-    whileHover: variant !== 'link' ? { scale: 1.03 } : undefined,
-    transition: { duration: 0.2 }
-  };
-
   if (href) {
     if (isExternal) {
       return (
-        <motion.a
+        <a
           href={href}
           className={buttonClasses}
           target="_blank"
           rel="noopener noreferrer"
-          {...animationProps}
+          onClick={onClick as React.MouseEventHandler<HTMLAnchorElement>}
         >
           {buttonContent}
-        </motion.a>
+        </a>
       );
     } else {
       return (
-        <motion.div {...animationProps}>
-          <Link to={href} className={buttonClasses}>
-            {buttonContent}
-          </Link>
-        </motion.div>
+        <Link 
+          to={href} 
+          className={buttonClasses}
+          onClick={onClick as React.MouseEventHandler<HTMLAnchorElement>}
+        >
+          {buttonContent}
+        </Link>
       );
     }
   }
 
-  // Use type assertion to safely pass props to motion.button
-  const buttonProps = props as MotionButtonProps;
-
   return (
-    <motion.button
+    <button
       className={buttonClasses}
-      {...animationProps}
-      {...buttonProps}
+      onClick={onClick}
+      {...props}
     >
       {buttonContent}
-    </motion.button>
+    </button>
   );
 };
 
