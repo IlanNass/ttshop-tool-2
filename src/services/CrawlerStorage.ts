@@ -6,6 +6,7 @@ interface CrawlerState {
   options: {
     interval: number;
     batchSize: number;
+    userAgent?: string;
   };
   lastRuntime: string;
 }
@@ -15,6 +16,7 @@ const DEFAULT_STATE: CrawlerState = {
   options: {
     interval: 30000,
     batchSize: 2,
+    userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
   },
   lastRuntime: new Date().toISOString(),
 };

@@ -75,7 +75,7 @@ export class CrawlerBackgroundService {
     return CrawlerBackgroundService.instance;
   }
 
-  public startCrawling(options?: { interval: number; batchSize: number }): void {
+  public startCrawling(options?: { interval: number; batchSize: number; userAgent?: string }): void {
     if (this.intervalId !== null) {
       this.stopCrawling();
     }
