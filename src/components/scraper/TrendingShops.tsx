@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendUpIcon, TrendDownIcon, TrendingUpIcon, AlertCircleIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, AlertCircle } from 'lucide-react';
 import { fadeInUp } from '@/lib/animations';
 import { TrendData } from '@/lib/types';
 import { DatabaseService } from '@/services/DatabaseService';
@@ -68,7 +68,7 @@ const TrendingShops: React.FC<TrendingShopsProps> = ({ timeRange }) => {
         initial="hidden"
         animate="visible"
       >
-        <AlertCircleIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+        <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
         <h3 className="mt-4 text-lg font-medium">No Trend Data</h3>
         <p className="mt-2 text-muted-foreground">
           Not enough historical data yet to show trends. Data will appear after the crawler has collected multiple snapshots.
@@ -94,11 +94,11 @@ const TrendingShops: React.FC<TrendingShopsProps> = ({ timeRange }) => {
                   <h3 className="text-lg font-medium">{shop.shopName}</h3>
                   <div className="flex items-center mt-1">
                     {shop.trend === 'up' ? (
-                      <TrendUpIcon className="h-5 w-5 text-green-500 mr-1" />
+                      <TrendingUp className="h-5 w-5 text-green-500 mr-1" />
                     ) : shop.trend === 'down' ? (
-                      <TrendDownIcon className="h-5 w-5 text-red-500 mr-1" />
+                      <TrendingDown className="h-5 w-5 text-red-500 mr-1" />
                     ) : (
-                      <TrendingUpIcon className="h-5 w-5 text-amber-500 mr-1" />
+                      <Activity className="h-5 w-5 text-amber-500 mr-1" />
                     )}
                     <span 
                       className={`text-sm font-medium ${
