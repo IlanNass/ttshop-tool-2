@@ -75,16 +75,24 @@ const Dashboard = () => {
     
     // Listen for crawler-data-updated events
     const handleDataUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
+      const customEvent = event as CustomEvent<ShopData>;
       if (customEvent.detail) {
+        console.log('Data update received in Dashboard:', customEvent.detail);
         setShopData(customEvent.detail);
       }
     };
     
     window.addEventListener('crawler-data-updated', handleDataUpdate);
     
+    // Subscribe to crawler service data updates directly
+    const unsubscribe = crawlerService.onDataUpdate((data) => {
+      console.log('Direct crawler service update in Dashboard:', data);
+      setShopData({...data});
+    });
+    
     return () => {
       window.removeEventListener('crawler-data-updated', handleDataUpdate);
+      unsubscribe();
     };
   }, []);
 
@@ -107,7 +115,8 @@ const Dashboard = () => {
   };
 
   const handleCrawlerDataUpdate = (data: ShopData) => {
-    setShopData(data);
+    console.log('Crawler data update handler called with:', data);
+    setShopData({...data});
     toast.info('New data collected', {
       description: `Automatically analyzed ${data.shops.length} TikTok Shops.`,
     });
@@ -138,7 +147,7 @@ const Dashboard = () => {
             </div>
             
             <div className="lg:col-span-9 space-y-8">
-              <DataTable data={shopData} isLoading={isLoading} />
+              <DataTable data={shopData} isLoading={isLoading} key={shopData?.lastUpdated || 'loading'} />
               
               <div className="mt-12 pt-8 border-t">
                 <TrendingShops timeRange={trendTimeRange} />

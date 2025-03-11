@@ -1,4 +1,3 @@
-
 import { ShopData, Shop, ShopProduct, CrawlerStats } from '@/lib/types';
 import { DatabaseService } from './DatabaseService';
 
@@ -128,8 +127,11 @@ export class TikTokCrawlerService {
     // Save data to database
     this.dbService.saveShopsData(this.shopData.shops);
     
-    // Notify subscribers
-    this.notifyDataUpdated();
+    // Create a deep copy of the shop data to avoid reference issues
+    const shopDataCopy = JSON.parse(JSON.stringify(this.shopData));
+    
+    // Notify subscribers with the copy
+    this.notifyDataUpdated(shopDataCopy);
   }
 
   private async crawlShop(url: string): Promise<void> {
@@ -160,10 +162,19 @@ export class TikTokCrawlerService {
     }
   }
 
-  private notifyDataUpdated(): void {
+  private notifyDataUpdated(data: ShopData = this.shopData): void {
+    // Call all callback functions
     for (const callback of this.onDataUpdateCallbacks) {
-      callback(this.shopData);
+      callback({...data});
     }
+    
+    // Dispatch a custom event for components that use event listeners
+    const event = new CustomEvent('crawler-data-updated', { 
+      detail: {...data}
+    });
+    window.dispatchEvent(event);
+    
+    console.log('Notified data update with', data.shops.length, 'shops');
   }
 
   private addMoreMockUrls(): void {
