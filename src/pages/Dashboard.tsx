@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -13,7 +12,6 @@ import { TikTokCrawlerService } from '@/services/TikTokCrawlerService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Mock data for demonstration
 const mockShopData: ShopData = {
   shops: [
     {
@@ -61,10 +59,8 @@ const mockShopData: ShopData = {
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [shopData, setShopData] = useState<ShopData | null>(null);
-  const [trendTimeRange, setTrendTimeRange] = useState(30); // 30 days default
   const { user } = useAuth();
 
-  // Initialize with data from the crawler service if it exists
   useEffect(() => {
     const crawlerService = TikTokCrawlerService.getInstance();
     const initialData = crawlerService.getCollectedData();
@@ -73,7 +69,6 @@ const Dashboard = () => {
       setShopData(initialData);
     }
     
-    // Listen for crawler-data-updated events
     const handleDataUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<ShopData>;
       if (customEvent.detail) {
@@ -90,7 +85,6 @@ const Dashboard = () => {
     
     window.addEventListener('crawler-data-updated', handleDataUpdate);
     
-    // Subscribe to crawler service data updates directly
     const unsubscribe = crawlerService.onDataUpdate((data) => {
       console.log('Direct crawler service update in Dashboard:', data);
       setShopData({...data});
@@ -105,7 +99,6 @@ const Dashboard = () => {
   const handleScrape = (url: string) => {
     setIsLoading(true);
     
-    // Parse URL to ensure it's a TikTok shop URL
     if (!url.includes('shop.tiktok.com')) {
       url = `https://shop.tiktok.com/@${url.replace('@', '')}`;
     }
@@ -114,17 +107,11 @@ const Dashboard = () => {
       description: `Analyzing TikTok Shop at ${url}`
     });
     
-    // Use the crawler service to fetch a specific shop
     const crawlerService = TikTokCrawlerService.getInstance();
     
-    // For the manual scraper, we'll use a different approach
-    // We'll create a one-off fetch and parse for this specific URL
     try {
-      // Simulate API call with timeout for now
-      // In a real implementation, this would use crawlerService.fetchShopData(url)
       setTimeout(async () => {
         try {
-          // Try to fetch the shop with the Googlebot user agent
           const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -135,14 +122,11 @@ const Dashboard = () => {
           });
           
           if (!response.ok) {
-            // If we couldn't fetch the real shop, use mock data
             setShopData(mockShopData);
             toast.warning('Using simulated data', {
               description: 'Could not connect to TikTok Shop. Using sample data instead.'
             });
           } else {
-            // Attempt to parse the shop data
-            // For now, just use mock data as a fallback if parsing fails
             setShopData(mockShopData);
             toast.success('Analysis completed', {
               description: 'TikTok Shop data has been analyzed.'
@@ -157,7 +141,6 @@ const Dashboard = () => {
         } finally {
           setIsLoading(false);
           
-          // Save to database
           const dbService = DatabaseService.getInstance();
           dbService.saveShopsData(mockShopData.shops);
         }
@@ -205,10 +188,6 @@ const Dashboard = () => {
             
             <div className="lg:col-span-9 space-y-8">
               <DataTable data={shopData} isLoading={isLoading} key={shopData?.lastUpdated || 'loading'} />
-              
-              <div className="mt-12 pt-8 border-t">
-                <TrendingShops timeRange={trendTimeRange} />
-              </div>
               
               <div className="text-center text-xs text-muted-foreground mt-8">
                 <p>Shop data is saved automatically for trend analysis.</p>

@@ -1,3 +1,4 @@
+
 export interface ShopProduct {
   name: string;
   price: number;
@@ -33,21 +34,14 @@ export interface CrawlerStats {
   batchSize: number;
 }
 
-// New types for historical data tracking
-export interface RevenueSnapshot {
-  shopName: string;
-  totalRevenue: number;
-  itemsSold: number;
-  timestamp: string;
-}
-
-export interface TrendData {
+// Shop history data for visualizations
+export interface ShopHistoryData {
   shopName: string;
   trend: 'up' | 'down' | 'stable';
   percentChange: number;
   revenueData: {
-    timestamp: string;
-    totalRevenue: number;
+    date: string;
+    revenue: number;
   }[];
 }
 
