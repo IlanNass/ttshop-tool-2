@@ -1,4 +1,3 @@
-
 export interface ShopProduct {
   name: string;
   price: number;
@@ -52,3 +51,13 @@ export interface TrendData {
   }[];
 }
 
+// Authentication types
+export interface User {
+  username: string;
+  isAuthenticated: boolean;
+}
+
+export interface Credentials {
+  username: string;
+  password: string;
+}

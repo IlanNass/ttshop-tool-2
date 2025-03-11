@@ -1,3 +1,4 @@
+
 import { ShopData, Shop, ShopProduct, CrawlerStats } from '@/lib/types';
 import { DatabaseService } from './DatabaseService';
 
@@ -18,7 +19,6 @@ interface CrawlerOptions {
 
 export class TikTokCrawlerService {
   private static instance: TikTokCrawlerService;
-  private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private shopData: ShopData = { shops: [], lastUpdated: new Date().toLocaleString() };
   private options: CrawlerOptions = {
@@ -33,6 +33,21 @@ export class TikTokCrawlerService {
   private constructor() {
     // Private constructor to enforce singleton pattern
     this.dbService = DatabaseService.getInstance();
+    
+    // Initialize with existing data from Database
+    const history = this.dbService.getRevenueHistory();
+    if (history.length > 0) {
+      // Process existing data to populate shopData
+      this.loadExistingData();
+    }
+  }
+
+  private loadExistingData(): void {
+    // This would load the latest shop data from the database
+    // For now we'll just initialize with mock data if available
+    
+    // For a real implementation, you would query for the latest snapshot of each shop
+    // and reconstruct the shop data properly
   }
 
   public static getInstance(): TikTokCrawlerService {
@@ -43,11 +58,6 @@ export class TikTokCrawlerService {
   }
 
   public startCrawling(options?: Partial<CrawlerOptions>): void {
-    if (this.isRunning) {
-      console.log('Crawler is already running');
-      return;
-    }
-
     // Update options if provided
     if (options) {
       this.options = { ...this.options, ...options };
@@ -56,24 +66,9 @@ export class TikTokCrawlerService {
     this.isRunning = true;
     console.log('Starting automated TikTok shop crawler');
     console.log(`Crawling interval: ${this.options.interval}ms, Batch size: ${this.options.batchSize}`);
-    
-    // Immediately run first batch
-    this.processBatch();
-    
-    // Schedule subsequent batches
-    this.intervalId = setInterval(() => {
-      this.processBatch();
-    }, this.options.interval);
   }
 
   public stopCrawling(): void {
-    if (!this.isRunning || !this.intervalId) {
-      console.log('Crawler is not running');
-      return;
-    }
-    
-    clearInterval(this.intervalId);
-    this.intervalId = null;
     this.isRunning = false;
     console.log('Stopped TikTok shop crawler');
   }
@@ -103,23 +98,11 @@ export class TikTokCrawlerService {
   }
 
   public updateOptions(options: Partial<CrawlerOptions>): void {
-    const wasRunning = this.isRunning;
-    
-    // Stop if running
-    if (wasRunning) {
-      this.stopCrawling();
-    }
-    
     // Update options
     this.options = { ...this.options, ...options };
-    
-    // Restart if it was running
-    if (wasRunning) {
-      this.startCrawling();
-    }
   }
 
-  private async processBatch(): Promise<void> {
+  public async processBatch(): Promise<void> {
     // Get next batch of unprocessed URLs
     const unprocessedUrls = this.discoveredUrls.filter(url => !this.processedUrls.has(url));
     const batchUrls = unprocessedUrls.slice(0, this.options.batchSize);

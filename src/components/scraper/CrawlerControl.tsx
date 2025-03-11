@@ -1,11 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Settings, RefreshCw, Database } from 'lucide-react';
+import { Play, Pause, Settings, RefreshCw, Database, LogOut } from 'lucide-react';
 import { fadeInUp } from '@/lib/animations';
 import Button from '../ui-custom/Button';
 import Card from '../ui-custom/Card';
 import { TikTokCrawlerService } from '@/services/TikTokCrawlerService';
+import { CrawlerBackgroundService } from '@/services/CrawlerBackgroundService';
+import { CrawlerStorage } from '@/services/CrawlerStorage';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CrawlerControlProps {
   onDataUpdate: (data: any) => void;
@@ -13,6 +16,7 @@ interface CrawlerControlProps {
 
 const CrawlerControl = ({ onDataUpdate }: CrawlerControlProps) => {
   const [isRunning, setIsRunning] = useState(false);
+  const { logout } = useAuth();
   const [stats, setStats] = useState({
     totalDiscovered: 0,
     totalProcessed: 0,
@@ -23,48 +27,79 @@ const CrawlerControl = ({ onDataUpdate }: CrawlerControlProps) => {
   const [showSettings, setShowSettings] = useState(false);
 
   const crawlerService = TikTokCrawlerService.getInstance();
+  const backgroundService = CrawlerBackgroundService.getInstance();
 
   useEffect(() => {
+    // Restore settings from storage
+    const state = CrawlerStorage.getState();
+    setIntervalMs(state.options.interval);
+    setBatchSize(state.options.batchSize);
+    setIsRunning(state.isRunning);
+
     // Set up the data update listener
     const unsubscribe = crawlerService.onDataUpdate((data) => {
       onDataUpdate(data);
     });
 
+    // Listen for crawler-data-updated events
+    const handleDataUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      onDataUpdate(customEvent.detail);
+    };
+    window.addEventListener('crawler-data-updated', handleDataUpdate);
+
     // Update status periodically
     const statusInterval = setInterval(() => {
       const status = crawlerService.getCurrentStatus();
-      setIsRunning(status.isRunning);
       setStats({
         totalDiscovered: status.totalDiscovered,
         totalProcessed: status.totalProcessed,
         queuedUrls: status.queuedUrls,
       });
+      
+      // Also check if background service is running
+      setIsRunning(backgroundService.isRunning() || state.isRunning);
     }, 1000);
 
     return () => {
       unsubscribe();
+      window.removeEventListener('crawler-data-updated', handleDataUpdate);
       clearInterval(statusInterval);
     };
   }, [onDataUpdate]);
 
   const startCrawling = () => {
-    crawlerService.startCrawling({
+    const options = {
       interval: intervalMs,
       batchSize: batchSize,
-    });
+    };
+    
+    crawlerService.startCrawling(options);
+    backgroundService.startCrawling(options);
     setIsRunning(true);
   };
 
   const stopCrawling = () => {
     crawlerService.stopCrawling();
+    backgroundService.stopCrawling();
     setIsRunning(false);
   };
 
   const applySettings = () => {
-    crawlerService.updateOptions({
+    const options = {
       interval: intervalMs,
       batchSize: batchSize,
-    });
+    };
+    
+    crawlerService.updateOptions(options);
+    CrawlerStorage.updateOptions(options);
+    
+    if (isRunning) {
+      // Restart with new settings
+      stopCrawling();
+      startCrawling();
+    }
+    
     setShowSettings(false);
   };
 
@@ -74,6 +109,14 @@ const CrawlerControl = ({ onDataUpdate }: CrawlerControlProps) => {
       : `${ms / 60000} minutes`;
   };
 
+  const handleLogout = () => {
+    // Stop crawler before logging out
+    if (isRunning) {
+      stopCrawling();
+    }
+    logout();
+  };
+
   return (
     <motion.div
       className="bg-card border rounded-xl p-6 shadow-sm"
@@ -81,7 +124,18 @@ const CrawlerControl = ({ onDataUpdate }: CrawlerControlProps) => {
       initial="hidden"
       animate="visible"
     >
-      <h2 className="text-xl font-semibold mb-4">Automated Crawler</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Automated Crawler</h2>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          icon={<LogOut size={16} />}
+          onClick={handleLogout}
+        >
+          Logout
+        </Button>
+      </div>
+      
       <p className="text-muted-foreground mb-6">
         Automatically discover and analyze TikTok Shops without manual input.
       </p>

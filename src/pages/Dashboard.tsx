@@ -11,6 +11,7 @@ import TrendingShops from '@/components/scraper/TrendingShops';
 import { ShopData } from '@/lib/types';
 import { TikTokCrawlerService } from '@/services/TikTokCrawlerService';
 import { DatabaseService } from '@/services/DatabaseService';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Mock data for demonstration
 const mockShopData: ShopData = {
@@ -61,6 +62,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [shopData, setShopData] = useState<ShopData | null>(null);
   const [trendTimeRange, setTrendTimeRange] = useState(30); // 30 days default
+  const { user } = useAuth();
 
   // Initialize with data from the crawler service if it exists
   useEffect(() => {
@@ -70,6 +72,20 @@ const Dashboard = () => {
     if (initialData.shops.length > 0) {
       setShopData(initialData);
     }
+    
+    // Listen for crawler-data-updated events
+    const handleDataUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail) {
+        setShopData(customEvent.detail);
+      }
+    };
+    
+    window.addEventListener('crawler-data-updated', handleDataUpdate);
+    
+    return () => {
+      window.removeEventListener('crawler-data-updated', handleDataUpdate);
+    };
   }, []);
 
   const handleScrape = (url: string) => {
@@ -111,7 +127,7 @@ const Dashboard = () => {
           <div className="max-w-3xl mx-auto mb-12 text-center">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">TikTok Shop Analyzer Dashboard</h1>
             <p className="text-muted-foreground text-lg">
-              Extract data from TikTok Shop and analyze performance metrics automatically.
+              Welcome, {user?.username}! Extract data from TikTok Shop and analyze performance metrics automatically.
             </p>
           </div>
           
