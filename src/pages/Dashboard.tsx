@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -6,7 +7,6 @@ import Footer from '@/components/layout/Footer';
 import ScraperForm from '@/components/scraper/ScraperForm';
 import DataTable from '@/components/scraper/DataTable';
 import CrawlerControl from '@/components/scraper/CrawlerControl';
-import TrendingShops from '@/components/scraper/TrendingShops';
 import { ShopData } from '@/lib/types';
 import { TikTokCrawlerService } from '@/services/TikTokCrawlerService';
 import { DatabaseService } from '@/services/DatabaseService';

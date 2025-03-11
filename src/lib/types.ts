@@ -55,3 +55,22 @@ export interface Credentials {
   username: string;
   password: string;
 }
+
+// Revenue snapshot for database service
+export interface RevenueSnapshot {
+  shopName: string;
+  totalRevenue: number;
+  itemsSold: number;
+  timestamp: string;
+}
+
+// Trend data for database service
+export interface TrendData {
+  shopName: string;
+  trend: 'up' | 'down' | 'stable';
+  percentChange: number;
+  revenueData: {
+    timestamp: string;
+    totalRevenue: number;
+  }[];
+}

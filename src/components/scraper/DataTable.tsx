@@ -38,24 +38,23 @@ const DataTable = ({ data, isLoading }: DataTableProps) => {
   useEffect(() => {
     if (expandedShop) {
       const dbService = DatabaseService.getInstance();
-      const historyData = dbService.getShopHistory(expandedShop);
+      const trends = dbService.getShopTrends(30);
+      const shopTrend = trends.find(trend => trend.shopName === expandedShop);
       
-      if (historyData && historyData.revenueData.length >= 2) {
-        const oldestRevenue = historyData.revenueData[0].revenue;
-        const latestRevenue = historyData.revenueData[historyData.revenueData.length - 1].revenue;
-        const percentChange = ((latestRevenue - oldestRevenue) / oldestRevenue) * 100;
-        
-        let trend: 'up' | 'down' | 'stable' = 'stable';
-        if (percentChange > 1) trend = 'up';
-        else if (percentChange < -1) trend = 'down';
+      if (shopTrend && shopTrend.revenueData.length >= 2) {
+        const historyData: ShopHistoryData = {
+          shopName: shopTrend.shopName,
+          trend: shopTrend.trend,
+          percentChange: shopTrend.percentChange,
+          revenueData: shopTrend.revenueData.map(data => ({
+            date: data.timestamp,
+            revenue: data.totalRevenue,
+          }))
+        };
         
         setShopHistory({
           ...shopHistory,
-          [expandedShop]: {
-            ...historyData,
-            percentChange,
-            trend
-          }
+          [expandedShop]: historyData
         });
       } else {
         setShopHistory({
@@ -123,7 +122,7 @@ const DataTable = ({ data, isLoading }: DataTableProps) => {
     );
   }
 
-  const sortedShops = [...data.shops].sort((a, b) => {
+  const sortedShops = [...(data?.shops || [])].sort((a, b) => {
     if (sort.field === 'name') {
       return sort.direction === 'asc'
         ? a.name.localeCompare(b.name)
@@ -268,7 +267,7 @@ const DataTable = ({ data, isLoading }: DataTableProps) => {
                     <tr className="bg-muted/20">
                       <td colSpan={4} className="px-4 py-3">
                         <div className="space-y-6">
-                          {shopHistory[shop.name] ? (
+                          {shopHistory[shop.name] && shopHistory[shop.name]?.revenueData.length >= 2 ? (
                             <div className="bg-card border rounded-lg p-4 shadow-sm">
                               <div className="flex justify-between items-start mb-4">
                                 <div>
