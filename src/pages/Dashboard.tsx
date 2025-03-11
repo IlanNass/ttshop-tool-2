@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import DashboardContent from '@/components/dashboard/DashboardContent';
 import ScraperForm from '@/components/scraper/ScraperForm';
 import DataTable from '@/components/scraper/DataTable';
 import CrawlerControl from '@/components/scraper/CrawlerControl';
@@ -163,42 +162,22 @@ const Dashboard = () => {
   };
 
   return (
-    <motion.div
-      className="min-h-screen flex flex-col"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
+    <DashboardLayout 
+      title="TikTok Shop Analyzer Dashboard"
+      subtitle={`Welcome, ${user?.username}! Extract data from TikTok Shop and analyze performance metrics automatically.`}
     >
-      <Header />
-      <main className="flex-1 pt-32 pb-20">
-        <div className="container px-6 mx-auto">
-          <div className="max-w-3xl mx-auto mb-12 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">TikTok Shop Analyzer Dashboard</h1>
-            <p className="text-muted-foreground text-lg">
-              Welcome, {user?.username}! Extract data from TikTok Shop and analyze performance metrics automatically.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-            <div className="lg:col-span-3 space-y-8">
-              <ScraperForm onScrape={handleScrape} isLoading={isLoading} />
-              <CrawlerControl onDataUpdate={handleCrawlerDataUpdate} />
-            </div>
-            
-            <div className="lg:col-span-9 space-y-8">
-              <DataTable data={shopData} isLoading={isLoading} key={shopData?.lastUpdated || 'loading'} />
-              
-              <div className="text-center text-xs text-muted-foreground mt-8">
-                <p>Shop data is saved automatically for trend analysis.</p>
-                <p>The crawler attempts to extract real data, but may fall back to simulated data if TikTok blocks access.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-      <Footer />
-    </motion.div>
+      <DashboardContent
+        leftColumn={
+          <>
+            <ScraperForm onScrape={handleScrape} isLoading={isLoading} />
+            <CrawlerControl onDataUpdate={handleCrawlerDataUpdate} />
+          </>
+        }
+        rightColumn={
+          <DataTable data={shopData} isLoading={isLoading} key={shopData?.lastUpdated || 'loading'} />
+        }
+      />
+    </DashboardLayout>
   );
 };
 
