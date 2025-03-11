@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { fadeInUp } from '@/lib/animations';
@@ -38,25 +37,21 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
   const backgroundService = CrawlerBackgroundService.getInstance();
 
   useEffect(() => {
-    // Restore settings from storage
     const state = CrawlerStorage.getState();
     setIntervalMs(state.options.interval);
     setBatchSize(state.options.batchSize);
     setIsRunning(state.isRunning);
 
-    // Set up the data update listener
     const unsubscribe = crawlerService.onDataUpdate((data) => {
       onDataUpdate(data);
     });
 
-    // Listen for crawler-data-updated events
     const handleDataUpdate = (event: Event) => {
       const customEvent = event as CustomEvent;
       onDataUpdate(customEvent.detail);
     };
     window.addEventListener('crawler-data-updated', handleDataUpdate);
 
-    // Update status periodically
     const statusInterval = setInterval(() => {
       const status = crawlerService.getCurrentStatus();
       setStats({
@@ -65,8 +60,7 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
         queuedUrls: status.queuedUrls,
       });
       
-      // Also check if background service is running
-      setIsRunning(backgroundService.isRunning() || state.isRunning);
+      setIsRunning(backgroundService.isRunning());
     }, 1000);
 
     return () => {
@@ -83,7 +77,6 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
       userAgent: userAgent,
     };
     
-    crawlerService.startCrawling(options);
     backgroundService.startCrawling(options);
     setIsRunning(true);
     
@@ -93,7 +86,6 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
   };
 
   const stopCrawling = () => {
-    crawlerService.stopCrawling();
     backgroundService.stopCrawling();
     setIsRunning(false);
     
@@ -111,7 +103,6 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
     CrawlerStorage.updateOptions(settings);
     
     if (isRunning) {
-      // Restart with new settings
       stopCrawling();
       startCrawling();
     }
@@ -122,7 +113,6 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
   };
 
   const handleLogout = () => {
-    // Stop crawler before logging out
     if (isRunning) {
       stopCrawling();
     }
@@ -130,9 +120,8 @@ const CrawlerControl: React.FC<CrawlerControlProps> = ({ onDataUpdate }) => {
   };
 
   const handleProcessNow = () => {
-    // Force the crawler to run a batch immediately
     if (isRunning) {
-      crawlerService.processBatch();
+      backgroundService.performCrawl();
     }
   };
 
