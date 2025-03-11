@@ -1,15 +1,9 @@
 
-import { ShopData, Shop, ShopProduct, CrawlerStats } from '@/lib/types';
+import { ShopData, Shop, CrawlerStats } from '@/lib/types';
 import { DatabaseService } from './DatabaseService';
-
-// Sample TikTok shop URLs to start the crawling process
-const TIKTOK_SHOP_URLS = [
-  'https://shop.tiktok.com/@sacheubeauty',
-  'https://shop.tiktok.com/@theordinary',
-  'https://shop.tiktok.com/@cerave',
-  'https://shop.tiktok.com/@elfcosmetics',
-  'https://shop.tiktok.com/@fentybeauty',
-];
+import { ShopExtractorService } from './ShopExtractorService';
+import { ShopDiscoveryService } from './ShopDiscoveryService';
+import { ShopDataService } from './ShopDataService';
 
 interface CrawlerOptions {
   interval: number; // in milliseconds
@@ -20,7 +14,6 @@ interface CrawlerOptions {
 export class TikTokCrawlerService {
   private static instance: TikTokCrawlerService;
   private isRunning = false;
-  private shopData: ShopData = { shops: [], lastUpdated: new Date().toLocaleString() };
   private options: CrawlerOptions = {
     interval: 30000, // Default to 30 seconds
     batchSize: 2, // Default to 2 shops per batch
@@ -28,12 +21,17 @@ export class TikTokCrawlerService {
   };
   private onDataUpdateCallbacks: ((data: ShopData) => void)[] = [];
   private processedUrls: Set<string> = new Set();
-  private discoveredUrls: string[] = [...TIKTOK_SHOP_URLS];
   private dbService: DatabaseService;
+  private shopExtractor: ShopExtractorService;
+  private shopDiscovery: ShopDiscoveryService;
+  private shopDataService: ShopDataService;
   
   private constructor() {
     // Private constructor to enforce singleton pattern
     this.dbService = DatabaseService.getInstance();
+    this.shopExtractor = new ShopExtractorService();
+    this.shopDiscovery = new ShopDiscoveryService();
+    this.shopDataService = ShopDataService.getInstance();
     
     // Initialize with existing data from Database
     const history = this.dbService.getRevenueHistory();
@@ -75,7 +73,7 @@ export class TikTokCrawlerService {
   }
 
   public getCollectedData(): ShopData {
-    return this.shopData;
+    return this.shopDataService.getShopData();
   }
 
   public onDataUpdate(callback: (data: ShopData) => void): () => void {
@@ -90,9 +88,9 @@ export class TikTokCrawlerService {
   public getCurrentStatus(): CrawlerStats {
     return {
       isRunning: this.isRunning,
-      totalDiscovered: this.discoveredUrls.length,
+      totalDiscovered: this.shopDiscovery.getDiscoveredUrlsCount(),
       totalProcessed: this.processedUrls.size,
-      queuedUrls: this.discoveredUrls.filter(url => !this.processedUrls.has(url)).length,
+      queuedUrls: this.shopDiscovery.getUnprocessedUrlsCount(this.processedUrls),
       interval: this.options.interval,
       batchSize: this.options.batchSize,
     };
@@ -105,13 +103,12 @@ export class TikTokCrawlerService {
 
   public async processBatch(): Promise<void> {
     // Get next batch of unprocessed URLs
-    const unprocessedUrls = this.discoveredUrls.filter(url => !this.processedUrls.has(url));
-    const batchUrls = unprocessedUrls.slice(0, this.options.batchSize);
+    const batchUrls = this.shopDiscovery.getNextBatch(this.processedUrls, this.options.batchSize);
     
     if (batchUrls.length === 0) {
       console.log('No more URLs to process. Looking for more TikTok shops...');
       // Try to discover more shop URLs
-      await this.discoverMoreShops();
+      await this.shopDiscovery.discoverMoreShops(this.options.userAgent);
       return;
     }
     
@@ -133,17 +130,14 @@ export class TikTokCrawlerService {
       }
     }
     
-    // Update timestamp
-    this.shopData.lastUpdated = new Date().toLocaleString();
+    // Update timestamp and notify subscribers
+    this.shopDataService.updateTimestamp();
     
     // Save data to database
-    this.dbService.saveShopsData(this.shopData.shops);
+    this.dbService.saveShopsData(this.shopDataService.getShopData().shops);
     
-    // Create a deep copy of the shop data to avoid reference issues
-    const shopDataCopy = JSON.parse(JSON.stringify(this.shopData));
-    
-    // Notify subscribers with the copy
-    this.notifyDataUpdated(shopDataCopy);
+    // Notify subscribers
+    this.notifyDataUpdated();
   }
 
   private async crawlShop(url: string): Promise<void> {
@@ -153,19 +147,28 @@ export class TikTokCrawlerService {
       // Extract shop name from URL
       const shopName = url.split('@')[1] || `Shop${Math.floor(Math.random() * 1000)}`;
       
-      // Attempt to fetch the shop page
-      const shopData = await this.fetchShopData(url);
+      // Attempt to fetch the shop page and extract data
+      const html = await this.fetchShopHtml(url);
+      if (!html) {
+        console.log(`Could not fetch HTML from ${url}, generating mock data`);
+        const mockShop = this.shopExtractor.generateMockShopData(url, shopName);
+        this.shopDataService.updateShopInCollection(mockShop);
+        return;
+      }
+      
+      // Extract shop data from HTML
+      const shopData = this.shopExtractor.extractShopDataFromHTML(html, url);
       
       // If no data was extracted, fall back to mock data with real shop name
       if (!shopData) {
         console.log(`Could not extract data from ${url}, generating mock data`);
-        const mockShop = this.generateMockShopData(url, shopName);
-        this.updateShopInCollection(mockShop);
+        const mockShop = this.shopExtractor.generateMockShopData(url, shopName);
+        this.shopDataService.updateShopInCollection(mockShop);
         return;
       }
       
       // Update our collected data with the real shop
-      this.updateShopInCollection(shopData);
+      this.shopDataService.updateShopInCollection(shopData);
       
       console.log(`Successfully processed shop: ${shopData.name}`);
     } catch (error) {
@@ -174,7 +177,7 @@ export class TikTokCrawlerService {
     }
   }
 
-  private async fetchShopData(url: string): Promise<Shop | null> {
+  private async fetchShopHtml(url: string): Promise<string | null> {
     try {
       console.log(`Fetching TikTok shop URL: ${url}`);
       
@@ -199,164 +202,16 @@ export class TikTokCrawlerService {
       const html = await response.text();
       console.log(`Received ${html.length} bytes of HTML from TikTok`);
       
-      // Extract shop data from HTML
-      return this.extractShopDataFromHTML(html, url);
+      return html;
     } catch (error) {
       console.error('Error fetching shop data:', error);
       return null;
     }
   }
 
-  private extractShopDataFromHTML(html: string, url: string): Shop | null {
-    try {
-      // Extract shop name from URL as fallback
-      const shopName = url.split('@')[1] || `Shop${Math.floor(Math.random() * 1000)}`;
-      
-      // Look for shop data in HTML
-      // This is simplified and would need to be adapted based on actual TikTok shop HTML structure
-      
-      // Try to find product data
-      const productMatches = html.match(/<div[^>]*product-item[^>]*>.*?<\/div>/gs);
-      const products: ShopProduct[] = [];
-      
-      let totalRevenue = 0;
-      let totalItems = 0;
-      
-      if (productMatches && productMatches.length > 0) {
-        console.log(`Found ${productMatches.length} potential products`);
-        
-        // Process up to 5 products max
-        const maxProducts = Math.min(productMatches.length, 5);
-        
-        for (let i = 0; i < maxProducts; i++) {
-          const productHTML = productMatches[i];
-          
-          // Try to extract product details (simplified)
-          const nameMatch = productHTML.match(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/);
-          const priceMatch = productHTML.match(/\$(\d+\.\d+|\d+)/);
-          
-          if (nameMatch && priceMatch) {
-            const productName = nameMatch[1].trim();
-            const price = parseFloat(priceMatch[1]);
-            
-            // Generate reasonable sales counts
-            const salesCount = Math.floor(100 + Math.random() * 1000);
-            const revenuePerItem = price * salesCount;
-            
-            products.push({
-              name: productName,
-              price: price,
-              salesCount: salesCount,
-              revenuePerItem: revenuePerItem
-            });
-            
-            totalRevenue += revenuePerItem;
-            totalItems += salesCount;
-          }
-        }
-      }
-      
-      // If we couldn't extract products, return null to fall back to mock data
-      if (products.length === 0) {
-        console.log('Could not extract product data, will use mock data');
-        return null;
-      }
-      
-      console.log(`Extracted ${products.length} products for shop ${shopName}`);
-      
-      return {
-        name: shopName,
-        totalRevenue: totalRevenue,
-        itemsSold: totalItems,
-        products: products
-      };
-    } catch (error) {
-      console.error('Error parsing HTML:', error);
-      return null;
-    }
-  }
-
-  private updateShopInCollection(shop: Shop): void {
-    // Check if shop already exists in our data
-    const existingShopIndex = this.shopData.shops.findIndex(s => s.name === shop.name);
+  private notifyDataUpdated(): void {
+    const data = this.shopDataService.getShopData();
     
-    if (existingShopIndex >= 0) {
-      // Update existing shop
-      this.shopData.shops[existingShopIndex] = shop;
-    } else {
-      // Add new shop
-      this.shopData.shops.push(shop);
-    }
-  }
-
-  private async discoverMoreShops(): Promise<void> {
-    // Try to find more TikTok shop URLs by:
-    // 1. Checking "related shops" sections on shop pages
-    // 2. Searching for TikTok shops on search engines
-    // 3. Exploring shop links shared on TikTok profiles
-    
-    try {
-      console.log('Attempting to discover more TikTok shops');
-      
-      // Simulate discovery with mock URLs for now
-      // In a real implementation, this would parse HTML to find related shop links
-      this.addMoreMockUrls();
-      
-      // Try to find more shop URLs from a search engine
-      await this.findShopURLsFromSearchEngines();
-      
-    } catch (error) {
-      console.error('Error discovering shops:', error);
-    }
-  }
-
-  private async findShopURLsFromSearchEngines(): Promise<void> {
-    try {
-      // Search Google for TikTok shops
-      const searchURL = 'https://www.google.com/search?q=site:shop.tiktok.com';
-      
-      console.log(`Searching for more TikTok shops via: ${searchURL}`);
-      
-      const response = await fetch(searchURL, {
-        method: 'GET',
-        headers: {
-          'User-Agent': this.options.userAgent,
-          'Accept': 'text/html',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
-      
-      if (!response.ok) {
-        console.log(`Search engine returned error: ${response.status}`);
-        return;
-      }
-      
-      const html = await response.text();
-      
-      // Extract URLs from search results
-      const urlRegex = /href="(https:\/\/shop\.tiktok\.com\/@[^"]+)"/g;
-      let match;
-      const newUrls: string[] = [];
-      
-      while ((match = urlRegex.exec(html)) !== null) {
-        const url = match[1];
-        if (!this.discoveredUrls.includes(url) && !this.processedUrls.has(url)) {
-          newUrls.push(url);
-        }
-      }
-      
-      if (newUrls.length > 0) {
-        console.log(`Discovered ${newUrls.length} new TikTok shop URLs from search`);
-        this.discoveredUrls.push(...newUrls);
-      } else {
-        console.log('No new TikTok shop URLs found from search');
-      }
-    } catch (error) {
-      console.error('Error searching for shops:', error);
-    }
-  }
-
-  private notifyDataUpdated(data: ShopData = this.shopData): void {
     // Call all callback functions
     for (const callback of this.onDataUpdateCallbacks) {
       callback({...data});
@@ -369,48 +224,5 @@ export class TikTokCrawlerService {
     window.dispatchEvent(event);
     
     console.log('Notified data update with', data.shops.length, 'shops');
-  }
-
-  private addMoreMockUrls(): void {
-    // Generate some random new shop URLs as fallback
-    const newUrls = Array.from({ length: 5 }, (_, i) => 
-      `https://shop.tiktok.com/@newshop${this.discoveredUrls.length + i}`
-    );
-    
-    this.discoveredUrls.push(...newUrls);
-    console.log(`Added ${newUrls.length} new shop URLs to the queue`);
-  }
-
-  private generateMockShopData(url: string, shopName: string = ''): Shop {
-    // Extract shop name from URL if not provided
-    if (!shopName) {
-      shopName = url.split('@')[1] || `Shop${Math.floor(Math.random() * 1000)}`;
-    }
-    
-    // Generate random metrics
-    const totalRevenue = Math.floor(10000 + Math.random() * 1000000);
-    const itemsSold = Math.floor(500 + Math.random() * 5000);
-    
-    // Generate random products
-    const productCount = Math.floor(2 + Math.random() * 5);
-    const products: ShopProduct[] = Array.from({ length: productCount }, (_, i) => {
-      const price = Math.floor(10 + Math.random() * 100);
-      const salesCount = Math.floor(50 + Math.random() * 1000);
-      const revenuePerItem = price * salesCount;
-      
-      return {
-        name: `Product ${i + 1} from ${shopName}`,
-        price,
-        salesCount,
-        revenuePerItem,
-      };
-    });
-    
-    return {
-      name: shopName,
-      totalRevenue,
-      itemsSold,
-      products,
-    };
   }
 }
