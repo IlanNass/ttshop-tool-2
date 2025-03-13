@@ -21,28 +21,39 @@ export class PuppeteerScraperService {
     if (!this.browser) {
       console.log('Initializing Puppeteer browser...');
       
-      // Use environment-specific configuration
-      const isProduction = process.env.NODE_ENV === 'production';
-      
-      // Configuration options
-      const options = {
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-          '--window-size=1920,1080',
-        ],
-        // In production environments like Render, we need to specify Chrome path
-        ...(isProduction && {
-          executablePath: '/usr/bin/google-chrome',
-        }),
-      };
-      
-      this.browser = await puppeteer.launch(options);
-      console.log('Puppeteer browser initialized successfully');
+      try {
+        // Use environment-specific configuration
+        const isProduction = process.env.NODE_ENV === 'production';
+        console.log(`Running in ${isProduction ? 'production' : 'development'} mode`);
+        
+        // Configuration options
+        const options = {
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--window-size=1920,1080',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--single-process', // This is important for render.com
+          ],
+          // In production environments like Render, we need to specify Chrome path
+          ...(isProduction && {
+            executablePath: '/usr/bin/google-chrome',
+            dumpio: true, // Log browser console to Node console for debugging
+          }),
+        };
+        
+        console.log('Launching browser with options:', JSON.stringify(options, null, 2));
+        this.browser = await puppeteer.launch(options);
+        console.log('Puppeteer browser initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize browser:', error);
+        throw error;
+      }
     }
   }
 
@@ -102,14 +113,27 @@ export class PuppeteerScraperService {
       console.log(`Starting Puppeteer scrape for: ${url}`);
       page = await this.createPage();
 
+      // Add more verbose logging
+      console.log('Page created successfully');
+      
       // Navigate to the shop URL
       console.log(`Navigating to: ${url}`);
       const response = await page.goto(url, {
         waitUntil: 'networkidle2',  // Wait until network is idle (no requests for 500ms)
+        timeout: 90000, // Longer timeout for production
       });
 
+      // Extended logging
+      if (!response) {
+        console.error('No response received from page.goto');
+      } else {
+        console.log(`Response status: ${response.status()}`);
+      }
+      
       if (!response || !response.ok()) {
         const status = response ? response.status() : 'unknown';
+        // Take a screenshot of the error page for debugging
+        await page.screenshot({ path: `./public/screenshots/error-${Date.now()}.png` });
         throw new Error(`Failed to load page, status: ${status}`);
       }
 
@@ -129,8 +153,9 @@ export class PuppeteerScraperService {
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Take screenshot for debugging
-      await page.screenshot({ path: `${shopName}-debug.png` });
-      console.log(`Took screenshot: ${shopName}-debug.png`);
+      const screenshotPath = `./public/screenshots/${shopName}-debug.png`;
+      await page.screenshot({ path: screenshotPath });
+      console.log(`Took screenshot: ${screenshotPath}`);
       
       // Extract products data
       console.log('Extracting product data...');
@@ -200,7 +225,7 @@ export class PuppeteerScraperService {
             pageContent.includes('verify') || pageContent.includes('challenge')) {
           console.log('Detected possible CAPTCHA or verification page');
           // Save the page HTML for debugging
-          await page.screenshot({ path: 'captcha-debug.png' });
+          await page.screenshot({ path: './public/screenshots/captcha-debug.png' });
         }
         
         throw new Error('No products found on page');
