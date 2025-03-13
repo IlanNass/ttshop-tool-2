@@ -3,7 +3,7 @@ import { DatabaseService } from './DatabaseService';
 import { ShopExtractorService } from './ShopExtractorService';
 import { ShopDiscoveryService } from './ShopDiscoveryService';
 import { ShopDataService } from './ShopDataService';
-import { PuppeteerScraperService } from './PuppeteerScraperService';
+import { ApiService } from './ApiService';
 
 interface CrawlerOptions {
   interval: number; // in milliseconds
@@ -25,7 +25,7 @@ export class TikTokCrawlerService {
   private shopExtractor: ShopExtractorService;
   private shopDiscovery: ShopDiscoveryService;
   private shopDataService: ShopDataService;
-  private puppeteerScraper: PuppeteerScraperService;
+  private apiService: ApiService;
   
   private constructor() {
     // Private constructor to enforce singleton pattern
@@ -33,7 +33,7 @@ export class TikTokCrawlerService {
     this.shopExtractor = new ShopExtractorService();
     this.shopDiscovery = new ShopDiscoveryService();
     this.shopDataService = ShopDataService.getInstance();
-    this.puppeteerScraper = new PuppeteerScraperService();
+    this.apiService = ApiService.getInstance();
     
     // Initialize with existing data from Database
     const history = this.dbService.getRevenueHistory();
@@ -146,8 +146,8 @@ export class TikTokCrawlerService {
     console.log(`Crawling TikTok shop: ${url}`);
     
     try {
-      // Use Puppeteer scraper instead of fetch
-      const shopData = await this.puppeteerScraper.scrapeShop(url);
+      // Use API service to scrape the shop
+      const shopData = await this.apiService.scrapeShop(url);
       
       if (!shopData) {
         throw new Error(`Failed to extract data from ${url}`);
@@ -188,10 +188,5 @@ export class TikTokCrawlerService {
     // Implement retry logic based on error type and retry count
     const retryCount = this.shopDiscovery.getRetryCount(url);
     return retryCount < 3; // Allow up to 3 retries
-  }
-
-  public async cleanup(): Promise<void> {
-    // Close the Puppeteer browser when done
-    await this.puppeteerScraper.close();
   }
 }
