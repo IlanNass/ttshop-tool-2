@@ -1,4 +1,3 @@
-
 import { ShopData, Shop, CrawlerStats } from '@/lib/types';
 import { DatabaseService } from './DatabaseService';
 import { ShopExtractorService } from './ShopExtractorService';
@@ -41,11 +40,11 @@ export class TikTokCrawlerService {
   }
 
   private loadExistingData(): void {
-    // This would load the latest shop data from the database
-    // For now we'll just initialize with mock data if available
-    
-    // For a real implementation, you would query for the latest snapshot of each shop
-    // and reconstruct the shop data properly
+    // Load the latest shop data from the database
+    const shops = this.dbService.getLatestShopData();
+    if (shops && shops.length > 0) {
+      shops.forEach(shop => this.shopDataService.updateShopInCollection(shop));
+    }
   }
 
   public static getInstance(): TikTokCrawlerService {
@@ -144,35 +143,28 @@ export class TikTokCrawlerService {
     console.log(`Crawling TikTok shop: ${url}`);
     
     try {
-      // Extract shop name from URL
-      const shopName = url.split('@')[1] || `Shop${Math.floor(Math.random() * 1000)}`;
-      
-      // Attempt to fetch the shop page and extract data
+      // Fetch the shop page HTML
       const html = await this.fetchShopHtml(url);
       if (!html) {
-        console.log(`Could not fetch HTML from ${url}, generating mock data`);
-        const mockShop = this.shopExtractor.generateMockShopData(url, shopName);
-        this.shopDataService.updateShopInCollection(mockShop);
-        return;
+        throw new Error(`Failed to fetch HTML from ${url}`);
       }
       
       // Extract shop data from HTML
       const shopData = this.shopExtractor.extractShopDataFromHTML(html, url);
-      
-      // If no data was extracted, fall back to mock data with real shop name
       if (!shopData) {
-        console.log(`Could not extract data from ${url}, generating mock data`);
-        const mockShop = this.shopExtractor.generateMockShopData(url, shopName);
-        this.shopDataService.updateShopInCollection(mockShop);
-        return;
+        throw new Error(`Failed to extract data from ${url}`);
       }
       
-      // Update our collected data with the real shop
+      // Update our collected data with the shop
       this.shopDataService.updateShopInCollection(shopData);
-      
       console.log(`Successfully processed shop: ${shopData.name}`);
+      
     } catch (error) {
       console.error(`Error crawling shop ${url}:`, error);
+      // Add to retry queue if appropriate
+      if (this.shouldRetry(url)) {
+        this.shopDiscovery.addToRetryQueue(url);
+      }
       throw error;
     }
   }
@@ -224,5 +216,11 @@ export class TikTokCrawlerService {
     window.dispatchEvent(event);
     
     console.log('Notified data update with', data.shops.length, 'shops');
+  }
+
+  private shouldRetry(url: string): boolean {
+    // Implement retry logic based on error type and retry count
+    const retryCount = this.shopDiscovery.getRetryCount(url);
+    return retryCount < 3; // Allow up to 3 retries
   }
 }

@@ -1,4 +1,3 @@
-
 // Sample TikTok shop URLs to start the crawling process
 const TIKTOK_SHOP_URLS = [
   'https://shop.tiktok.com/@sacheubeauty',
@@ -9,19 +8,20 @@ const TIKTOK_SHOP_URLS = [
 ];
 
 export class ShopDiscoveryService {
-  private discoveredUrls: string[] = [...TIKTOK_SHOP_URLS];
+  private discoveredUrls: Set<string> = new Set();
+  private retryQueue: Map<string, number> = new Map(); // URL -> retry count
   
   public getDiscoveredUrlsCount(): number {
-    return this.discoveredUrls.length;
+    return this.discoveredUrls.size;
   }
   
   public getUnprocessedUrlsCount(processedUrls: Set<string>): number {
-    return this.discoveredUrls.filter(url => !processedUrls.has(url)).length;
+    return this.discoveredUrls.size - processedUrls.size;
   }
   
   public getNextBatch(processedUrls: Set<string>, batchSize: number): string[] {
-    const unprocessedUrls = this.discoveredUrls.filter(url => !processedUrls.has(url));
-    return unprocessedUrls.slice(0, batchSize);
+    const unprocessedUrls = new Set([...this.discoveredUrls].filter(url => !processedUrls.has(url)));
+    return Array.from(unprocessedUrls).slice(0, batchSize);
   }
   
   public async discoverMoreShops(userAgent: string): Promise<void> {
@@ -71,14 +71,14 @@ export class ShopDiscoveryService {
       
       while ((match = urlRegex.exec(html)) !== null) {
         const url = match[1];
-        if (!this.discoveredUrls.includes(url)) {
+        if (!this.discoveredUrls.has(url)) {
           newUrls.push(url);
         }
       }
       
       if (newUrls.length > 0) {
         console.log(`Discovered ${newUrls.length} new TikTok shop URLs from search`);
-        this.discoveredUrls.push(...newUrls);
+        newUrls.forEach(url => this.discoveredUrls.add(url));
       } else {
         console.log('No new TikTok shop URLs found from search');
       }
@@ -96,11 +96,11 @@ export class ShopDiscoveryService {
       ];
       
       const newUrls = brands
-        .filter(brand => !this.discoveredUrls.some(url => url.includes(`@${brand}`)))
+        .filter(brand => !this.discoveredUrls.has(`https://shop.tiktok.com/@${brand}`))
         .map(brand => `https://shop.tiktok.com/@${brand}`);
       
       if (newUrls.length > 0) {
-        this.discoveredUrls.push(...newUrls);
+        newUrls.forEach(url => this.discoveredUrls.add(url));
         console.log(`Generated ${newUrls.length} synthetic TikTok shop URLs`);
       }
       
@@ -111,10 +111,19 @@ export class ShopDiscoveryService {
   private addMoreMockUrls(): void {
     // Generate some random new shop URLs as fallback
     const newUrls = Array.from({ length: 5 }, (_, i) => 
-      `https://shop.tiktok.com/@newshop${this.discoveredUrls.length + i}`
+      `https://shop.tiktok.com/@newshop${this.discoveredUrls.size + i}`
     );
     
-    this.discoveredUrls.push(...newUrls);
+    newUrls.forEach(url => this.discoveredUrls.add(url));
     console.log(`Added ${newUrls.length} new shop URLs to the queue`);
+  }
+
+  public addToRetryQueue(url: string): void {
+    const currentRetries = this.retryQueue.get(url) || 0;
+    this.retryQueue.set(url, currentRetries + 1);
+  }
+
+  public getRetryCount(url: string): number {
+    return this.retryQueue.get(url) || 0;
   }
 }

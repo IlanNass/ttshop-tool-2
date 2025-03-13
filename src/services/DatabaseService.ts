@@ -1,4 +1,3 @@
-
 import { Shop, RevenueSnapshot, TrendData } from '@/lib/types';
 
 // Simulating a database with localStorage
@@ -106,5 +105,29 @@ export class DatabaseService {
 
   public clearHistory(): void {
     localStorage.setItem(this.REVENUE_HISTORY_KEY, JSON.stringify([]));
+  }
+
+  public getLatestShopData(): Shop[] {
+    try {
+      const history = this.getRevenueHistory();
+      const latestShops = new Map<string, Shop>();
+      
+      // Convert revenue snapshots to shop data
+      history.forEach(snapshot => {
+        if (!latestShops.has(snapshot.shopName)) {
+          latestShops.set(snapshot.shopName, {
+            name: snapshot.shopName,
+            totalRevenue: snapshot.totalRevenue,
+            itemsSold: snapshot.itemsSold,
+            products: [] // Products not stored in snapshots
+          });
+        }
+      });
+      
+      return Array.from(latestShops.values());
+    } catch (error) {
+      console.error('Error getting latest shop data:', error);
+      return [];
+    }
   }
 }
