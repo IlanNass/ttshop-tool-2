@@ -15,7 +15,9 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:dev": "NODE_ENV=development node server.js",
+    "debug": "NODE_OPTIONS='--inspect' node server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
