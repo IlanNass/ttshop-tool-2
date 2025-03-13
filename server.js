@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
@@ -26,6 +26,61 @@ async function ensureDir(dirPath) {
 // Create required directories
 ensureDir(path.join(__dirname, 'public', 'screenshots'));
 
+// Find Chrome executable path - be very specific about locations
+async function findChromeExecutablePath() {
+  console.log('Finding Chrome executable path...');
+  
+  // Check environment variable first
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    console.log(`Using Chrome path from environment: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
+    try {
+      await fs.access(process.env.PUPPETEER_EXECUTABLE_PATH);
+      console.log('Confirmed executable exists at the path');
+      return process.env.PUPPETEER_EXECUTABLE_PATH;
+    } catch (err) {
+      console.error(`Chrome executable not found at ${process.env.PUPPETEER_EXECUTABLE_PATH}:`, err.message);
+    }
+  }
+  
+  // List of possible Chrome paths on Render and Linux systems
+  const possiblePaths = [
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/app/.apt/usr/bin/google-chrome-stable',
+    '/app/.apt/usr/bin/google-chrome',
+    '/app/.chrome/bin/chrome'
+  ];
+  
+  // Check each path
+  for (const chromePath of possiblePaths) {
+    try {
+      console.log(`Checking Chrome path: ${chromePath}`);
+      await fs.access(chromePath);
+      console.log(`Chrome found at: ${chromePath}`);
+      return chromePath;
+    } catch (err) {
+      console.log(`Chrome not found at: ${chromePath}`);
+    }
+  }
+  
+  // Try to find using which command
+  try {
+    const { stdout } = await execAsync('which google-chrome-stable || which google-chrome || which chromium');
+    const chromePath = stdout.trim();
+    if (chromePath) {
+      console.log(`Chrome found using 'which' command at: ${chromePath}`);
+      return chromePath;
+    }
+  } catch (err) {
+    console.log('Failed to find Chrome using which command:', err.message);
+  }
+  
+  console.error('Could not find Chrome executable in any expected location');
+  return null;
+}
+
 // Puppeteer scraper setup - only runs on server
 let browser = null;
 
@@ -38,30 +93,33 @@ async function initBrowser() {
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD,
     });
     
-    // Try to locate Chrome
-    let chromeVersionResult;
+    // Get Chrome path
+    const chromePath = await findChromeExecutablePath();
+    if (!chromePath) {
+      console.error('No Chrome executable found, cannot proceed with browser initialization');
+      return null;
+    }
+    
+    // Try to get Chrome version directly
     try {
-      chromeVersionResult = await execAsync('google-chrome-stable --version || google-chrome --version');
-      console.log('Chrome version:', chromeVersionResult.stdout.trim());
+      const { stdout } = await execAsync(`"${chromePath}" --version`);
+      console.log('Chrome version from executable:', stdout.trim());
     } catch (err) {
-      console.warn('Could not detect Chrome version:', err.message);
+      console.warn('Could not get Chrome version:', err.message);
     }
     
     // Simple Puppeteer launch with minimal options
     const launchOptions = {
+      executablePath: chromePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--window-size=1280,720'
       ],
       headless: true
     };
-    
-    // Use executable path from environment if available
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      console.log(`Using Chrome path from environment: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
-      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
     
     console.log('Launching browser with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
@@ -74,8 +132,6 @@ async function initBrowser() {
     return browser;
   } catch (error) {
     console.error('Failed to initialize browser:', error);
-    
-    // Return mock data for this instance
     return null;
   }
 }
