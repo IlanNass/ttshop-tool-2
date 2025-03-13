@@ -20,7 +20,12 @@ export class PuppeteerScraperService {
   private async initialize(): Promise<void> {
     if (!this.browser) {
       console.log('Initializing Puppeteer browser...');
-      this.browser = await puppeteer.launch({
+      
+      // Use environment-specific configuration
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      // Configuration options
+      const options = {
         headless: true,
         args: [
           '--no-sandbox',
@@ -29,8 +34,14 @@ export class PuppeteerScraperService {
           '--disable-accelerated-2d-canvas',
           '--disable-gpu',
           '--window-size=1920,1080',
-        ]
-      });
+        ],
+        // In production environments like Render, we need to specify Chrome path
+        ...(isProduction && {
+          executablePath: '/usr/bin/google-chrome',
+        }),
+      };
+      
+      this.browser = await puppeteer.launch(options);
       console.log('Puppeteer browser initialized successfully');
     }
   }

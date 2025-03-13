@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ttshop-tool
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 16
+    buildFilter:
+      paths:
+        - src/**
+        - package.json
+        - package-lock.json
+        - vite.config.ts
+        - tsconfig.json
+        - server.js
+    preDeployCommand: |
+      apt-get update
+      apt-get install -y wget gnupg ca-certificates procps libxss1 libasound2
+      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+      sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+      apt-get update
+      apt-get install -y google-chrome-stable
+      rm -rf /var/lib/apt/lists/* 
