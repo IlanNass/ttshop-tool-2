@@ -3,6 +3,7 @@ import { DatabaseService } from './DatabaseService';
 import { ShopExtractorService } from './ShopExtractorService';
 import { ShopDiscoveryService } from './ShopDiscoveryService';
 import { ShopDataService } from './ShopDataService';
+import { PuppeteerScraperService } from './PuppeteerScraperService';
 
 interface CrawlerOptions {
   interval: number; // in milliseconds
@@ -24,6 +25,7 @@ export class TikTokCrawlerService {
   private shopExtractor: ShopExtractorService;
   private shopDiscovery: ShopDiscoveryService;
   private shopDataService: ShopDataService;
+  private puppeteerScraper: PuppeteerScraperService;
   
   private constructor() {
     // Private constructor to enforce singleton pattern
@@ -31,6 +33,7 @@ export class TikTokCrawlerService {
     this.shopExtractor = new ShopExtractorService();
     this.shopDiscovery = new ShopDiscoveryService();
     this.shopDataService = ShopDataService.getInstance();
+    this.puppeteerScraper = new PuppeteerScraperService();
     
     // Initialize with existing data from Database
     const history = this.dbService.getRevenueHistory();
@@ -119,8 +122,8 @@ export class TikTokCrawlerService {
         await this.crawlShop(url);
         this.processedUrls.add(url);
         
-        // Random delay between requests to avoid detection (1-3 seconds)
-        const delay = 1000 + Math.random() * 2000;
+        // Random delay between requests to avoid detection (3-7 seconds)
+        const delay = 3000 + Math.random() * 4000;
         await new Promise(resolve => setTimeout(resolve, delay));
       } catch (error) {
         console.error(`Error processing ${url}:`, error);
@@ -143,14 +146,9 @@ export class TikTokCrawlerService {
     console.log(`Crawling TikTok shop: ${url}`);
     
     try {
-      // Fetch the shop page HTML
-      const html = await this.fetchShopHtml(url);
-      if (!html) {
-        throw new Error(`Failed to fetch HTML from ${url}`);
-      }
+      // Use Puppeteer scraper instead of fetch
+      const shopData = await this.puppeteerScraper.scrapeShop(url);
       
-      // Extract shop data from HTML
-      const shopData = this.shopExtractor.extractShopDataFromHTML(html, url);
       if (!shopData) {
         throw new Error(`Failed to extract data from ${url}`);
       }
@@ -166,38 +164,6 @@ export class TikTokCrawlerService {
         this.shopDiscovery.addToRetryQueue(url);
       }
       throw error;
-    }
-  }
-
-  private async fetchShopHtml(url: string): Promise<string | null> {
-    try {
-      console.log(`Fetching TikTok shop URL: ${url}`);
-      
-      // Make HTTP request with headers to mimic Googlebot
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': this.options.userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-        },
-      });
-      
-      if (!response.ok) {
-        console.error(`HTTP error ${response.status}: ${response.statusText}`);
-        return null;
-      }
-      
-      // Get HTML content
-      const html = await response.text();
-      console.log(`Received ${html.length} bytes of HTML from TikTok`);
-      
-      return html;
-    } catch (error) {
-      console.error('Error fetching shop data:', error);
-      return null;
     }
   }
 
@@ -222,5 +188,10 @@ export class TikTokCrawlerService {
     // Implement retry logic based on error type and retry count
     const retryCount = this.shopDiscovery.getRetryCount(url);
     return retryCount < 3; // Allow up to 3 retries
+  }
+
+  public async cleanup(): Promise<void> {
+    // Close the Puppeteer browser when done
+    await this.puppeteerScraper.close();
   }
 }
